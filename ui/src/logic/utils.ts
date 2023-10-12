@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import ob from 'urbit-ob';
 import bigInt, { BigInteger } from 'big-integer';
 import isURL from 'validator/es/lib/isURL';
@@ -83,13 +83,31 @@ export function useObjectChangeLogging(
   o: Record<string, unknown>,
   logger: Console = window.console
 ) {
+  const counter = useRef(0);
   const lastValues = useRef(o);
   Object.entries(o).forEach(([k, v]) => {
     if (v !== lastValues.current[k]) {
-      logger.log('[change]', k);
+      logger.log(`[change:${counter.current}]`, k, v);
       lastValues.current[k] = v;
     }
   });
+  counter.current += 1;
+}
+
+/**
+ * Ensure that the identity of a BigInt value remains stable if the underlying
+ * value remains the same.
+ */
+export function useBigInt(value?: BigInteger) {
+  const lastValueRef = useRef(value);
+  return useMemo(() => {
+    const last = lastValueRef.current;
+    if (last !== value && last && value && last.eq(value)) {
+      return last;
+    }
+    lastValueRef.current = value;
+    return value;
+  }, [value]);
 }
 
 export function logTime(...args: any[]) {

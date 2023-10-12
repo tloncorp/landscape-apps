@@ -1,7 +1,5 @@
 import { Virtualizer, useVirtualizer } from '@tanstack/react-virtual';
-import { daToUnix } from '@urbit/api';
 import React, {
-  PropsWithChildren,
   ReactElement,
   useCallback,
   useEffect,
@@ -18,94 +16,28 @@ import {
 import { BigInteger } from 'big-integer';
 import BTree from 'sorted-btree';
 
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner';
 import {
   useUserHasScrolled,
   useInvertedScrollInteraction,
 } from '@/logic/scroll';
 import { useIsMobile } from '@/logic/useMedia';
+import { useMessageData } from '@/logic/useScrollerMessages';
 import {
-  ChatMessageListItemData,
-  useMessageData,
-} from '@/logic/useScrollerMessages';
-import { createDevLogger, useObjectChangeLogging } from '@/logic/utils';
+  createDevLogger,
+  useBigInt,
+  useObjectChangeLogging,
+} from '@/logic/utils';
 import EmptyPlaceholder from '@/components/EmptyPlaceholder';
 import { ChatWrit } from '@/types/chat';
 import { useChatState } from '@/state/chat';
-import ChatMessage from '../ChatMessage/ChatMessage';
-import ChatNotice from '../ChatNotice';
 import { useChatStore } from '../useChatStore';
+import ChatLoader from './ChatLoader';
+import {
+  CustomScrollItemData,
+  ChatScrollerListItem,
+} from './ChatScrollerListItem';
 
 const logger = createDevLogger('ChatScroller', false);
-
-interface CustomScrollItemData {
-  type: 'custom';
-  key: string;
-  component: ReactElement;
-}
-
-const ChatScrollerItem = React.memo(
-  ({
-    item,
-    isScrolling,
-  }: {
-    item: ChatMessageListItemData | CustomScrollItemData;
-    isScrolling: boolean;
-  }) => {
-    if (item.type === 'custom') {
-      return item.component;
-    }
-
-    const { writ, time } = item;
-    const content = writ?.memo?.content ?? {};
-    if ('notice' in content) {
-      return (
-        <ChatNotice
-          key={writ.seal.id}
-          writ={writ}
-          newDay={new Date(daToUnix(time))}
-        />
-      );
-    }
-
-    return (
-      <ChatMessage key={writ.seal.id} isScrolling={isScrolling} {...item} />
-    );
-  }
-);
-
-function Loader({
-  className,
-  scaleY,
-  children,
-}: PropsWithChildren<{ className?: string; scaleY: number }>) {
-  return (
-    <div
-      className={`absolute flex w-full justify-start text-base ${className}`}
-      style={{ transform: `scaleY(${scaleY})` }}
-    >
-      <div className="m-4 flex items-center gap-3 rounded-lg text-gray-500">
-        <div className="flex h-6 w-6 items-center justify-center">
-          <LoadingSpinner primary="fill-gray-900" secondary="fill-gray-200" />
-        </div>
-
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function useBigInt(value?: BigInteger) {
-  const lastValueRef = useRef(value);
-  return useMemo(() => {
-    const last = lastValueRef.current;
-    if (last !== value && last && value && last.eq(value)) {
-      return last;
-    }
-    lastValueRef.current = value;
-    return value;
-  }, [value]);
-}
 
 function useFakeVirtuosoHandle(
   ref: React.RefObject<VirtuosoHandle>,
@@ -513,9 +445,9 @@ export default function ChatScroller({
         }}
       >
         {isLoadingAtStart && !isInverted && (
-          <Loader className="top-0" scaleY={scaleY}>
+          <ChatLoader className="top-0" scaleY={scaleY}>
             Loading {isInverted ? 'Newer' : 'Older'}
-          </Loader>
+          </ChatLoader>
         )}
         {virtualItems.map((virtualItem) => {
           const item = messageEntries[transformIndex(virtualItem.index)];
@@ -529,14 +461,14 @@ export default function ChatScroller({
                 transform: `scaleY(${scaleY})`,
               }}
             >
-              <ChatScrollerItem item={item} isScrolling={isScrolling} />
+              <ChatScrollerListItem item={item} isScrolling={isScrolling} />
             </div>
           );
         })}
         {isLoadingAtEnd && isInverted && (
-          <Loader className="bottom-0" scaleY={scaleY}>
+          <ChatLoader className="bottom-0" scaleY={scaleY}>
             Loading {isInverted ? 'Older' : 'Newer'}
-          </Loader>
+          </ChatLoader>
         )}
       </div>
     </div>
