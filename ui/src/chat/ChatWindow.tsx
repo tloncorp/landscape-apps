@@ -1,9 +1,11 @@
-import React, { ReactElement, useCallback, useEffect, useRef } from 'react';
-import _ from 'lodash';
 import bigInt from 'big-integer';
+import React, { ReactElement, useCallback, useEffect, useRef } from 'react';
 import { useMatch, useSearchParams } from 'react-router-dom';
 import { VirtuosoHandle } from 'react-virtuoso';
+import ChatScroller from '@/chat/ChatScroller/ChatScroller';
 import ChatUnreadAlerts from '@/chat/ChatUnreadAlerts';
+import ArrowS16Icon from '@/components/icons/ArrowS16Icon';
+import useChatScrollerQuery from '@/logic/useChatScrollerQuery';
 import {
   useChatInitialized,
   useChatState,
@@ -11,10 +13,8 @@ import {
   useWritWindow,
 } from '@/state/chat';
 import { useRouteGroup } from '@/state/groups';
-import ChatScroller from '@/chat/ChatScroller/ChatScroller';
-import ArrowS16Icon from '@/components/icons/ArrowS16Icon';
-import { useChatInfo, useChatStore } from './useChatStore';
 import ChatScrollerPlaceholder from './ChatScroller/ChatScrollerPlaceholder';
+import { useChatInfo, useChatStore } from './useChatStore';
 
 interface ChatWindowProps {
   whom: string;
@@ -52,10 +52,19 @@ export default function ChatWindow({
   const msg = searchParams.get('msg');
   const scrollTo = getScrollTo(whom, thread, msg);
   const initialized = useChatInitialized(whom);
-  const messages = useMessagesForChat(whom, scrollTo);
+  const messages = useMessagesForChat(whom, {
+    near: scrollTo,
+    includeReplies: false,
+  });
   const window = useWritWindow(whom);
   const scrollerRef = useRef<VirtuosoHandle>(null);
   const readTimeout = useChatInfo(whom).unread?.readTimeout;
+
+  const scrollerQuery = useChatScrollerQuery({
+    whom,
+    scrollTo,
+    messages,
+  });
 
   const goToLatest = useCallback(() => {
     setSearchParams({});
@@ -66,7 +75,6 @@ export default function ChatWindow({
     if (scrollTo && !thread) {
       useChatState.getState().fetchMessagesAround(whom, '25', scrollTo);
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollTo?.toString(), thread]);
 
@@ -103,15 +111,18 @@ export default function ChatWindow({
            * internal scroll index would remain the same. So, if one scrolled
            * far back in a long channel, then switched to a less active one,
            * the channel would be scrolled to the top.
+           * NOTE: not sure if this is necessary for react-virtual.
            */
           key={whom}
-          messages={messages}
           whom={whom}
+          messages={messages}
+          query={scrollerQuery}
           topLoadEndMarker={prefixedElement}
           scrollTo={scrollTo}
           scrollerRef={scrollerRef}
           scrollElementRef={scrollElementRef}
           isScrolling={isScrolling}
+          isThread={false}
         />
       </div>
       {scrollTo && !window?.latest ? (

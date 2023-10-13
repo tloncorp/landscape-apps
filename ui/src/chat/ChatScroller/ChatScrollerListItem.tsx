@@ -1,6 +1,6 @@
 import { daToUnix } from '@urbit/api';
 import React, { ReactElement } from 'react';
-import { ChatMessageListItemData } from '@/logic/useScrollerMessages';
+import { ChatScrollerMessageItem } from '@/logic/useChatScrollerItems';
 import ChatMessage from '../ChatMessage/ChatMessage';
 import ChatNotice from '../ChatNotice';
 
@@ -15,14 +15,14 @@ export const ChatScrollerListItem = React.memo(
     item,
     isScrolling,
   }: {
-    item: ChatMessageListItemData | CustomScrollItemData;
+    item: ChatScrollerMessageItem | CustomScrollItemData;
     isScrolling: boolean;
   }) => {
     if (item.type === 'custom') {
       return item.component;
     }
 
-    const { writ, time } = item;
+    const { writ, time } = item.message;
     const content = writ?.memo?.content ?? {};
     if ('notice' in content) {
       return (
@@ -35,7 +35,11 @@ export const ChatScrollerListItem = React.memo(
     }
 
     return (
-      <ChatMessage key={writ.seal.id} isScrolling={isScrolling} {...item} />
+      <ChatMessage
+        key={writ.seal.id}
+        isScrolling={isScrolling}
+        {...item.message}
+      />
     );
   }
 );

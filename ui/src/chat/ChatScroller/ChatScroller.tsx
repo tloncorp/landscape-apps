@@ -21,7 +21,8 @@ import {
   useInvertedScrollInteraction,
 } from '@/logic/scroll';
 import { useIsMobile } from '@/logic/useMedia';
-import { useMessageData } from '@/logic/useScrollerMessages';
+import useChatScrollerItems from '@/logic/useChatScrollerItems';
+import { ChatScrollerQuery } from '@/logic/useChatScrollerQuery';
 import {
   createDevLogger,
   useBigInt,
@@ -86,7 +87,8 @@ const loaderPadding = {
 export interface ChatScrollerProps {
   whom: string;
   messages: BTree<BigInteger, ChatWrit>;
-  replying?: boolean;
+  isThread?: boolean;
+  query: ChatScrollerQuery;
   /**
    * Element to be inserted at the top of the list scroll after we've loaded the
    * entire history.
@@ -101,13 +103,22 @@ export interface ChatScrollerProps {
 export default function ChatScroller({
   whom,
   messages,
-  replying = false,
+  query,
+  isThread = false,
   topLoadEndMarker,
   scrollTo: rawScrollTo = undefined,
   scrollerRef,
   scrollElementRef,
   isScrolling,
 }: ChatScrollerProps) {
+  const {
+    fetchState,
+    fetchNewer,
+    fetchOlder,
+    hasLoadedNewest,
+    hasLoadedOldest,
+  } = query;
+
   const isMobile = useIsMobile();
   const scrollTo = useBigInt(rawScrollTo);
   const [loadDirection, setLoadDirection] = useState<'newer' | 'older'>(
@@ -116,21 +127,6 @@ export default function ChatScroller({
   const contentElementRef = useRef<HTMLDivElement>(null);
   const { userHasScrolled, resetUserHasScrolled } =
     useUserHasScrolled(scrollElementRef);
-
-  const {
-    activeMessageKeys,
-    activeMessageEntries,
-    fetchMessages,
-    fetchState,
-    hasLoadedNewest,
-    hasLoadedOldest,
-  } = useMessageData({
-    whom,
-    scrollTo,
-    messages,
-    replying,
-  });
-
   const topItem: CustomScrollItemData | null = useMemo(
     () =>
       topLoadEndMarker && hasLoadedOldest
@@ -143,32 +139,32 @@ export default function ChatScroller({
     [topLoadEndMarker, hasLoadedOldest]
   );
 
-  const [messageKeys, messageEntries] = useMemo(() => {
-    const nextMessageKeys = [
-      ...(topItem ? [topItem.key] : []),
-      ...activeMessageKeys,
-    ];
-    const nextMessageEntries = [
-      ...(topItem ? [topItem] : []),
-      ...activeMessageEntries,
-    ];
-    return [nextMessageKeys, nextMessageEntries];
-  }, [activeMessageKeys, activeMessageEntries, topItem]);
+  const messageItems = useChatScrollerItems({
+    whom,
+    scrollTo,
+    messages,
+    isThread,
+  });
 
-  const count = messageKeys.length;
+  const scrollerItems = useMemo(
+    () => (topItem ? [topItem, ...messageItems] : messageItems),
+    [messageItems, topItem]
+  );
+
+  const count = scrollerItems.length;
 
   const anchorIndex = useMemo(() => {
     if (count === 0) {
       return null;
     }
     if (scrollTo) {
-      const index = messageKeys.findIndex(
-        (k) => !(typeof k === 'string') && k.greaterOrEquals(scrollTo)
+      const index = scrollerItems.findIndex(
+        (i) => !(typeof i.key === 'string') && i.key.greaterOrEquals(scrollTo)
       );
       return index === -1 ? null : index;
     }
     return count - 1;
-  }, [messageKeys, count, scrollTo]);
+  }, [scrollerItems, count, scrollTo]);
 
   const virtualizerRef = useRef<DivVirtualizer>();
 
@@ -268,8 +264,8 @@ export default function ChatScroller({
     // further reduce jank / reflow necessity.
     estimateSize: useCallback((index: number) => 100, []),
     getItemKey: useCallback(
-      (index: number) => messageKeys[transformIndex(index)].toString(),
-      [messageKeys, transformIndex]
+      (index: number) => scrollerItems[transformIndex(index)].key.toString(),
+      [scrollerItems, transformIndex]
     ),
     paddingStart,
     paddingEnd,
@@ -349,7 +345,7 @@ export default function ChatScroller({
       measuredHeight < scrollElementHeight &&
       fetchState === 'initial' &&
       // don't try to load more in threads, because their content is already fetched by main window
-      !replying
+      !isThread
     ) {
       const loadingNewer = loadDirection === 'newer';
       if (
@@ -357,12 +353,12 @@ export default function ChatScroller({
         (!loadingNewer && !hasLoadedOldest)
       ) {
         logger.log('not enough content, loading more');
-        fetchMessages(loadingNewer);
+        fetchNewer();
       }
     }
   }, [
-    replying,
-    fetchMessages,
+    isThread,
+    fetchNewer,
     fetchState,
     loadDirection,
     hasLoadedNewest,
@@ -379,11 +375,11 @@ export default function ChatScroller({
       logger.log('LOAD: older');
       setLoadDirection('older');
       chatStore.bottom(false);
-      fetchMessages(false);
+      fetchOlder();
     } else if (isAtNewest && !hasLoadedNewest) {
       logger.log('LOAD: newer');
       setLoadDirection('newer');
-      fetchMessages(true);
+      fetchNewer();
       chatStore.bottom(true);
       chatStore.delayedRead(whom, () => useChatState.getState().markRead(whom));
     }
@@ -391,7 +387,8 @@ export default function ChatScroller({
     fetchState,
     isAtOldest,
     isAtNewest,
-    fetchMessages,
+    fetchOlder,
+    fetchNewer,
     whom,
     hasLoadedOldest,
     hasLoadedNewest,
@@ -450,7 +447,7 @@ export default function ChatScroller({
           </ChatLoader>
         )}
         {virtualItems.map((virtualItem) => {
-          const item = messageEntries[transformIndex(virtualItem.index)];
+          const item = scrollerItems[transformIndex(virtualItem.index)];
           return (
             <div
               key={virtualItem.key}

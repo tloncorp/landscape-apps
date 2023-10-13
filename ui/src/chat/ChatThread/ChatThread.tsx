@@ -23,6 +23,7 @@ import MobileHeader from '@/components/MobileHeader';
 import useAppName from '@/logic/useAppName';
 import { useIsScrolling } from '@/logic/scroll';
 import { useChatInputFocus } from '@/logic/ChatInputFocusContext';
+import useChatScrollerQuery from '@/logic/useChatScrollerQuery';
 import ChatScrollerPlaceholder from '../ChatScroller/ChatScrollerPlaceholder';
 
 export default function ChatThread() {
@@ -71,6 +72,13 @@ export default function ChatThread() {
     _.intersection(perms.writers, vessel.sects).length !== 0;
   const { compatible, text } = useChannelCompatibility(`chat/${flag}`);
   const shouldApplyPaddingBottom = isMobile && !isChatInputFocused;
+
+  const scrollerQuery = useChatScrollerQuery({
+    whom,
+    scrollTo,
+    messages: replies,
+    isThread: true,
+  });
 
   const returnURL = useCallback(() => {
     if (!time || !writ) return '#';
@@ -172,7 +180,8 @@ export default function ChatThread() {
             messages={replies.with(time, writ)}
             whom={whom}
             scrollerRef={scrollerRef}
-            replying
+            isThread
+            query={scrollerQuery}
             scrollTo={scrollTo}
             scrollElementRef={scrollElementRef}
             isScrolling={isScrolling}

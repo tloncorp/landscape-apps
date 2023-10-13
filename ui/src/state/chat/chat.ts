@@ -814,15 +814,29 @@ export function useWritWindow(whom: string, time?: BigInteger) {
 }
 
 const emptyWrits = newWritMap();
-export function useMessagesForChat(whom: string, near?: BigInteger) {
+export function useMessagesForChat(
+  whom: string,
+  {
+    near,
+    includeReplies = true,
+  }: { near?: BigInteger; includeReplies?: boolean } = { includeReplies: true }
+) {
   const window = useWritWindow(whom, near);
   const writs = useChatState(useCallback((s) => s.pacts[whom]?.writs, [whom]));
-
-  return useMemo(() => {
-    return window && writs
-      ? newWritMap(writs.getRange(window.oldest, window.newest, true))
-      : writs || emptyWrits;
-  }, [writs, window]);
+  const updatedWrits = useMemo(
+    () =>
+      window && writs
+        ? newWritMap(writs.getRange(window.oldest, window.newest, true))
+        : writs || emptyWrits,
+    [writs, window]
+  );
+  return useMemo(
+    () =>
+      includeReplies
+        ? updatedWrits
+        : updatedWrits.filter((key, writ) => !writ.memo.replying),
+    [includeReplies, updatedWrits]
+  );
 }
 
 export function useHasMessages(whom: string) {
