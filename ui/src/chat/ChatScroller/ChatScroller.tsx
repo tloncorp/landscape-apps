@@ -1,6 +1,8 @@
 import { Virtualizer, useVirtualizer } from '@tanstack/react-virtual';
 import React, {
+  FC,
   ReactElement,
+  ReactNode,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -37,6 +39,7 @@ import {
   CustomScrollItemData,
   ChatScrollerListItem,
 } from './ChatScrollerListItem';
+import ChatScrollerDebugOverlay from './ChatScrollerDebugOverlay';
 
 const logger = createDevLogger('ChatScroller', false);
 
@@ -98,6 +101,7 @@ export interface ChatScrollerProps {
   scrollerRef: React.RefObject<VirtuosoHandle>;
   scrollElementRef: React.RefObject<HTMLDivElement>;
   isScrolling: boolean;
+  showDebugOverlay?: boolean;
 }
 
 export default function ChatScroller({
@@ -110,6 +114,7 @@ export default function ChatScroller({
   scrollerRef,
   scrollElementRef,
   isScrolling,
+  showDebugOverlay,
 }: ChatScrollerProps) {
   const {
     fetchState,
@@ -286,7 +291,6 @@ export default function ChatScroller({
         // item on screen pinned, but we need to override that behavior to keep a
         // message centered or to stay at the bottom of the chat.
         if (anchorIndex !== null && !userHasScrolled) {
-          // Fix for no-param-reassign
           scrollToAnchor();
         } else {
           instance.scrollElement?.scrollTo?.({
@@ -418,56 +422,78 @@ export default function ChatScroller({
   // TODO: Distentangle virtualizer init to avoid this.
 
   return (
-    <div
-      ref={scrollElementRef}
-      className="h-full w-full overflow-y-auto overflow-x-clip overscroll-contain"
-      style={{ transform: `scaleY(${scaleY})` }}
-      // We need this in order to get key events on the div, which we use remap
-      // arrow and spacebar navigation when scrolling.
-      // TODO: This now gets outlined when scrolling with keys. Should it?
-      tabIndex={-1}
-    >
-      {hasLoadedNewest && hasLoadedOldest && count === 0 && (
-        <EmptyPlaceholder>
-          There are no messages in this channel
-        </EmptyPlaceholder>
-      )}
+    <>
       <div
-        className="l-0 absolute top-0 w-full"
-        ref={contentElementRef}
-        style={{
-          height: `${measuredHeight}px`,
-          paddingTop: virtualItems[0]?.start ?? 0,
-          pointerEvents: isScrolling ? 'none' : 'all',
-        }}
+        ref={scrollElementRef}
+        className="h-full w-full overflow-y-auto overflow-x-clip overscroll-contain"
+        style={{ transform: `scaleY(${scaleY})` }}
+        // We need this in order to get key events on the div, which we use remap
+        // arrow and spacebar navigation when scrolling.
+        // TODO: This now gets outlined when scrolling with keys. Should it?
+        tabIndex={-1}
       >
-        {isLoadingAtStart && !isInverted && (
-          <ChatLoader className="top-0" scaleY={scaleY}>
-            Loading {isInverted ? 'Newer' : 'Older'}
-          </ChatLoader>
+        {hasLoadedNewest && hasLoadedOldest && count === 0 && (
+          <EmptyPlaceholder>
+            There are no messages in this channel
+          </EmptyPlaceholder>
         )}
-        {virtualItems.map((virtualItem) => {
-          const item = scrollerItems[transformIndex(virtualItem.index)];
-          return (
-            <div
-              key={virtualItem.key}
-              className="relative w-full px-4 sm:hover:z-10"
-              ref={virtualizer.measureElement}
-              data-index={virtualItem.index}
-              style={{
-                transform: `scaleY(${scaleY})`,
-              }}
-            >
-              <ChatScrollerListItem item={item} isScrolling={isScrolling} />
-            </div>
-          );
-        })}
-        {isLoadingAtEnd && isInverted && (
-          <ChatLoader className="bottom-0" scaleY={scaleY}>
-            Loading {isInverted ? 'Older' : 'Newer'}
-          </ChatLoader>
-        )}
+        <div
+          className="l-0 absolute top-0 w-full"
+          ref={contentElementRef}
+          style={{
+            height: `${measuredHeight}px`,
+            paddingTop: virtualItems[0]?.start ?? 0,
+            pointerEvents: isScrolling ? 'none' : 'all',
+          }}
+        >
+          {isLoadingAtStart && !isInverted && (
+            <ChatLoader className="top-0" scaleY={scaleY}>
+              Loading {isInverted ? 'Newer' : 'Older'}
+            </ChatLoader>
+          )}
+          {virtualItems.map((virtualItem) => {
+            const item = scrollerItems[transformIndex(virtualItem.index)];
+            return (
+              <div
+                key={virtualItem.key}
+                className="relative w-full px-4 sm:hover:z-10"
+                ref={virtualizer.measureElement}
+                data-index={virtualItem.index}
+                style={{
+                  transform: `scaleY(${scaleY})`,
+                }}
+              >
+                <ChatScrollerListItem item={item} isScrolling={isScrolling} />
+              </div>
+            );
+          })}
+          {isLoadingAtEnd && isInverted && (
+            <ChatLoader className="bottom-0" scaleY={scaleY}>
+              Loading {isInverted ? 'Older' : 'Newer'}
+            </ChatLoader>
+          )}
+        </div>
       </div>
-    </div>
+      {showDebugOverlay ? (
+        <ChatScrollerDebugOverlay
+          {...{
+            count,
+            scrollOffset: virtualizer.scrollOffset,
+            scrollHeight: lastContentHeight,
+            hasLoadedNewest,
+            hasLoadedOldest,
+            anchorIndex,
+            isInverted,
+            loadDirection,
+            isAtScrollStart,
+            isAtScrollEnd,
+            isAtOldest,
+            isAtNewest,
+            fetchState,
+            userHasScrolled,
+          }}
+        />
+      ) : null}
+    </>
   );
 }

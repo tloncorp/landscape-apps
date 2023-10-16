@@ -14,9 +14,7 @@ function AppDecorator({ children }: PropsWithChildren) {
   return (
     <TooltipProvider>
       <QueryClientProvider client={queryClient}>
-        <div className="h-full w-full overflow-auto">
-          <div className="p-10">{children}</div>
-        </div>
+        <div className="h-full w-full overflow-auto">{children}</div>
       </QueryClientProvider>
     </TooltipProvider>
   );

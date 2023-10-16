@@ -9,8 +9,21 @@ describe('ChatScroller', () => {
   it('can render an empty list', () => {
     const ref = React.createRef<VirtuosoHandle>();
     const scrollRef = React.createRef<HTMLDivElement>();
+    const fetchNewer = async () => {
+      // noop
+    };
+    const fetchOlder = async () => {
+      // noop
+    };
     const result = render(
       <ChatScroller
+        query={{
+          hasLoadedNewest: true,
+          hasLoadedOldest: true,
+          fetchState: 'initial',
+          fetchNewer,
+          fetchOlder,
+        }}
         messages={new BTree()}
         whom={'test'}
         scrollerRef={ref}
