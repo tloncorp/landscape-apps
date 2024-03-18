@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 
 import GroupActions from '@/groups/GroupActions';
 import GroupAvatar from '@/groups/GroupAvatar';
@@ -23,15 +24,30 @@ const GroupsSidebarItem = React.memo(
     );
     const enableImages = useMemo(() => !isScrolling, [isScrolling]);
 
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const handleNavigate = useCallback(() => {
+      navigate(`/groups/${flag}/info`, {
+        state: { backgroundLocation: location },
+      });
+    }, [navigate, flag, location]);
+
     useEffect(() => {
-      if (!isMobile) {
+      if (!isMobile || isNew) {
         return;
       }
 
       if (action === 'longpress') {
-        setOptionsOpen(true);
+        handleNavigate();
       }
-    }, [action, isMobile]);
+
+      // FIXME: the exhaustive deps rule is disabled because we don't want to
+      // trigger the navigation when something deep in isMobile or any of the
+      // dependencies of handleNavigate change.
+
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [action]);
 
     return (
       <SidebarItem
