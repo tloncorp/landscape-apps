@@ -3,7 +3,8 @@
 ::    note: all subscriptions are handled by the subscriber library so
 ::    we can have resubscribe loop protection.
 ::
-/-  g=groups, zero=groups-0, ha=hark, h=heap, d=channels, c=chat, tac=contacts
+/-  g=groups, zero=groups-0, ha=hark, h=heap, d=channels, c=chat, tac=contacts,
+    activity
 /-  meta
 /-  e=epic
 /+  default-agent, verb, dbug
@@ -94,6 +95,16 @@
 ++  emit  |=(=card cor(cards [card cards]))
 ++  emil  |=(caz=(list card) cor(cards (welp (flop caz) cards)))
 ++  give  |=(=gift:agent:gall (emit %give gift))
+::
+++  submit-activity
+  |=  =event:activity
+  ^+  cor
+  ?.  .^(? %gu /(scot %p our.bowl)/activity/(scot %da now.bowl)/$)
+    cor
+  %-  emit
+  =/  =cage  [%activity-action !>(`action:activity`[%add event])]
+  [%pass /activity/submit %agent [our.bowl %activity] %poke cage]
+::
 ++  check-known
   |=  =ship
   ^-  ?(%alien %known)
@@ -848,6 +859,30 @@
       out
     (~(put in out) who)
   ::
+  ++  go-activity
+    =,  activity
+    |=  $=  concern
+        $%  [%join =ship]
+            [%kick =ship]
+            [%flag key=?(message-key [message-key message-key]) =nest:c]
+            [%role =ship roles=(set sect:g)]
+            [%ask =ship]
+        ==
+    ^+  go-core
+    =.  cor
+      %-  submit-activity
+      ^-  event
+      ?-  -.concern
+        %join  [%join ^flag ship.concern]
+        %kick  [%kick ^flag ship.concern]
+        %flag  ?:  ?=(message-key key.concern)
+                 [%flag key.concern nest.concern ^flag]
+               [%flag -.key.concern +.key.concern nest.concern ^flag]
+        %role  [%role ^flag [ship roles]:concern]
+        %ask   [%ask ^flag ship.concern]
+      ==
+    go-core
+  ::
   ++  go-channel-hosts
     ^-  (set ship)
     %-  ~(gas in *(set ship))
@@ -1314,6 +1349,8 @@
           ==
       ==
     =.  cor  (emit (pass-hark new-yarn))
+    ::TODO  want to (go-activity %flag), but we would need
+    ::      a more detailed "key" than just the post-key
     go-core
   ++  go-zone-update
     |=  [=zone:g =delta:zone:g]
@@ -1467,7 +1504,13 @@
           ==
         =?  cor  go-is-our-bloc
           (emit (pass-hark new-yarn))
-        go-core
+        =+  ships=~(tap in ships)
+        |-
+        ?~  ships  go-core
+        =.  go-core
+          =<  ?>(?=(%shut -.cordon.group) .)  ::NOTE  tmi
+          (go-activity %ask i.ships)
+        $(ships t.ships)
       ::
           [%del-ships %ask]
         ?>  |(go-is-bloc =(~(tap in q.diff) ~[src.bowl]))
@@ -1551,6 +1594,12 @@
         ==
       =?  cor  go-is-our-bloc
         (emit (pass-hark new-yarn))
+      =.  go-core
+        =+  ships=~(tap in ships)
+        |-
+        ?~  ships  go-core
+        =.  go-core  (go-activity %join i.ships)
+        $(ships t.ships)
       ?-  -.cordon
           ?(%open %afar)  go-core
           %shut
@@ -1592,6 +1641,12 @@
         ==
       =?  cor  go-is-our-bloc
         (emit (pass-hark new-yarn))
+      =.  go-core
+        =+  ships=~(tap in ships)
+        |-
+        ?~  ships  go-core
+        =.  go-core  (go-activity %kick i.ships)
+        $(ships t.ships)
       ?:  (~(has in ships) our.bowl)
         go-core(gone &)
       go-core
@@ -1633,7 +1688,11 @@
         ==
       =?  cor  go-is-our-bloc
         (emit (pass-hark new-yarn))
-      go-core
+      =+  ships=~(tap in ships)
+      |-
+      ?~  ships  go-core
+      =.  go-core  (go-activity %role i.ships sects.diff)
+      $(ships t.ships)
     ::
         %del-sects
       ?>  go-is-bloc
@@ -1809,6 +1868,16 @@
     =/  ga=gang:g  (~(gut by xeno) f [~ ~ ~])
     ga-core(flag f, gang ga)
   ::
+  ++  ga-activity
+    =,  activity
+    |=  concern=[%group-invite =ship]
+    ^+  ga-core
+    =.  cor
+      %-  submit-activity
+      ^-  event
+      [%group-invite ^flag ship.concern]
+    ga-core
+  ::
   ++  ga-area  `wire`/gangs/(scot %p p.flag)/[q.flag]
   ++  ga-pass
     |%
@@ -1906,7 +1975,7 @@
             ==
           =?  cor  !(~(has by groups) flag)
             (emit (pass-hark new-yarn))
-          ga-core
+          (ga-activity %group-invite src.bowl)
           ::
             %kick
           ?.  (~(has by xeno) flag)  ga-core
