@@ -5,7 +5,6 @@ import React, {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { VirtuosoHandle } from 'react-virtuoso';
@@ -15,7 +14,7 @@ import ChatUnreadAlerts from '@/chat/ChatUnreadAlerts';
 import EmptyPlaceholder from '@/components/EmptyPlaceholder';
 import ArrowS16Icon from '@/components/icons/ArrowS16Icon';
 import { useChannelCompatibility } from '@/logic/channel';
-import { log } from '@/logic/utils';
+import useSubsetOfMessagesForScroller from '@/logic/useSubsetOfMessagesForScroller';
 import { useInfinitePosts, useMarkReadMutation } from '@/state/channel/channel';
 
 import ChatScrollerPlaceholder from './ChatScroller/ChatScrollerPlaceholder';
@@ -77,6 +76,32 @@ export default function ChatWindow({
         : false,
     [scrollToId, messages]
   );
+  const {
+    scrollerMessages,
+    onAtBottom,
+    onAtTop,
+    shouldInvert,
+    hasLoadedNewest,
+    hasLoadedOldest,
+    isLoadingNewer,
+    isLoadingOlder,
+  } = useSubsetOfMessagesForScroller(
+    messages,
+    isLoading,
+    isFetching,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+    hasNextPage,
+    fetchPreviousPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    whom,
+    nest,
+    scrollToId,
+    scrollToIndex,
+    msgIdTimeInMessages,
+    markRead
+  );
   const latestIsMoreThan30NewerThanScrollTo = useMemo(
     () =>
       scrollToIndex !== latestMessageIndex &&
@@ -114,28 +139,10 @@ export default function ChatWindow({
 
   useEffect(() => {
     useChatStore.getState().setCurrent(whom);
-
     return () => {
       useChatStore.getState().setCurrent('');
     };
   }, [whom]);
-
-  const onAtBottom = useCallback(() => {
-    const { bottom, delayedRead } = useChatStore.getState();
-    bottom(true);
-    delayedRead(whom, () => markRead({ nest }));
-    if (hasPreviousPage && !isFetching) {
-      log('fetching previous page');
-      fetchPreviousPage();
-    }
-  }, [nest, whom, markRead, fetchPreviousPage, hasPreviousPage, isFetching]);
-
-  const onAtTop = useCallback(() => {
-    if (hasNextPage && !isFetching) {
-      log('fetching next page');
-      fetchNextPage();
-    }
-  }, [fetchNextPage, hasNextPage, isFetching]);
 
   // read the messages once navigated away
   useEffect(() => {
@@ -204,9 +211,10 @@ export default function ChatWindow({
            * the channel would be scrolled to the top.
            */
           key={whom}
-          messages={messages}
-          isLoadingOlder={isFetchingNextPage}
-          isLoadingNewer={isFetchingPreviousPage}
+          messages={scrollerMessages}
+          shouldInvert={shouldInvert}
+          isLoadingOlder={isLoadingOlder}
+          isLoadingNewer={isLoadingNewer}
           whom={whom}
           topLoadEndMarker={prefixedElement}
           scrollTo={scrollToId ? bigInt(scrollToId) : undefined}
@@ -215,8 +223,8 @@ export default function ChatWindow({
           onAtBottom={onAtBottom}
           scrollElementRef={scrollElementRef}
           isScrolling={isScrolling}
-          hasLoadedOldest={!hasNextPage}
-          hasLoadedNewest={!hasPreviousPage}
+          hasLoadedOldest={hasLoadedOldest}
+          hasLoadedNewest={hasLoadedNewest}
         />
       </div>
       {scrollToId &&
